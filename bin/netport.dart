@@ -81,7 +81,7 @@ Future<void> getModem(String address) async {
   }
 
 /// Write Serial port data to the TCP Socket
-void handleSerialPortData(Uint8List lines) async {
+Future<void> handleSerialPortData(Uint8List lines) async {
   print(String.fromCharCodes(lines));
   if(b_NetConnected) {
     _tcp.write(String.fromCharCodes(lines)); // for String data
@@ -91,7 +91,7 @@ void handleSerialPortData(Uint8List lines) async {
 }
 
 /// Write TCP data to the Serial Port
-void handleTCPPortData(Uint8List lines) {
+Future<void> handleTCPPortData(Uint8List lines) async {
   print(String.fromCharCodes(lines));
   if(_modem.isOpen) {
     _modem.write(lines);
@@ -104,7 +104,7 @@ void getTcp(Socket client) {
     _tcp.setOption(SocketOption.tcpNoDelay, true);
     b_NetConnected = true;
     //String controlBuffer = '';
-    // print('Control client waiting for data...');
+    print('Control client connected...');
     client.listen((Uint8List data) async {
         handleTCPPortData(data);            
     },
