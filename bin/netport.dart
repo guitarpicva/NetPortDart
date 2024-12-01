@@ -1,4 +1,4 @@
-import 'package:netport/netport.dart' as netport;
+// import 'package:netport/netport.dart' as netport;
 import 'package:libserialport/libserialport.dart';
 import 'dart:io';
 import 'dart:async';
@@ -11,14 +11,22 @@ String serBuffer = '';
 bool b_NetConnected = false;
 void main(List<String> arguments) {
   print('NetPort!');
+  var port = '19798'; // default
   /// create the socket/serial to the modem/controller and set up handlers
-  startTcpServer(19798);  
-
-  getModem("ttyACM0");
+  
+  String serial = 'ttyACM0'; // default for Harris radio
+  if(arguments.isNotEmpty) {
+    serial = arguments.first;
+  }
+  if(arguments.length > 1) {
+    port = arguments.elementAt(1);
+  }
+  startTcpServer(int.parse(port));  
+  getModem(serial);
 }
 
-/// Start the control server process to listen on the chosen
-  /// ip address and port passed from the command line
+/// Start the server process to listen on the any
+  /// ip address.
   /// Automatically starts the client socket handler upon
   /// new connection (one connection only)
   Future<ServerSocket> startTcpServer(int port) async {
@@ -50,24 +58,17 @@ Future<void> getModem(String address) async {
         // essentially Windows is the only other viable candidate ATM
         print('Windows Radio:$address');
         _modem = SerialPort(address); // i.e. COM23
-        _modem.config = spc;
         open = _modem.openReadWrite();        
+        _modem.config = spc;        
       }      
       if (open) {
         print("$address: OPEN!");
         final reader = SerialPortReader(_modem);
         reader.stream.listen((data) {
-          // serBuffer += String.fromCharCodes(data);
-          // //print("serBuffer: $data");
-          // if(serBuffer.contains("\r\n")) {
-          //   //print("run handler: $serBuffer");
-          //   int endex = serBuffer.lastIndexOf("\r\n") + 2;
-          //   String lines = serBuffer.substring(0, endex);
-            handleAsciiPortData(data);
-            // serBuffer = serBuffer.substring(endex);
-          // }
+          handleSerialPortData(data);
         });
-      } else {
+      } 
+      else {
         print("$address: NOT OPEN!");
         _modem.dispose();
       }
@@ -79,14 +80,17 @@ Future<void> getModem(String address) async {
     return; // _modem;
   }
 
-void handleAsciiPortData(Uint8List lines) {
+/// Write Serial port data to the TCP Socket
+void handleSerialPortData(Uint8List lines) async {
   print(String.fromCharCodes(lines));
   if(b_NetConnected) {
-    _tcp.write(lines);
-    _tcp.flush();
+    _tcp.write(String.fromCharCodes(lines)); // for String data
+    // or _tcp.write(lines); // for binary data
+    await _tcp.flush();
   }
 }
 
+/// Write TCP data to the Serial Port
 void handleTCPPortData(Uint8List lines) {
   print(String.fromCharCodes(lines));
   if(_modem.isOpen) {
@@ -101,20 +105,16 @@ void getTcp(Socket client) {
     b_NetConnected = true;
     //String controlBuffer = '';
     // print('Control client waiting for data...');
-    client.listen(
-        (Uint8List data) async {
-          // controlBuffer += String.fromCharCodes(data);
-          // if(controlBuffer.contains("\n")) {
-            handleTCPPortData(data);            
-          // }
-        },
-        cancelOnError: false,
-        onError: (error) {
-          print('Control client error: $error');
-        },
-        onDone: () {
-          print('Control client finished...');
-          client.close();
-          b_NetConnected = false;
-        });
+    client.listen((Uint8List data) async {
+        handleTCPPortData(data);            
+    },
+    cancelOnError: false,
+    onError: (error) {
+      print('Control client error: $error');
+    },
+    onDone: () {
+      print('Control client finished...');
+      client.close();
+      b_NetConnected = false;
+    });
   }
