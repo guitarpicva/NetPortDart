@@ -8,7 +8,7 @@ late SerialPort _modem;
 late ServerSocket _ss;
 late Socket _tcp;
 String serBuffer = '';
-bool b_NetConnected = false;
+bool bNetConnected = false;
 void main(List<String> arguments) {
   print('NetPort!');
   var port = '19798'; // default
@@ -26,18 +26,18 @@ void main(List<String> arguments) {
 }
 
 /// Start the server process to listen on the any
-  /// ip address.
-  /// Automatically starts the client socket handler upon
-  /// new connection (one connection only)
-  Future<ServerSocket> startTcpServer(int port) async {
-    var ss =
-        await ServerSocket.bind(InternetAddress.anyIPv4, port, shared: true);
-    _ss = ss;
-    ss.listen((client) {
-      getTcp(client);
-    });
-    return ss;
-  }
+/// ip address.
+/// Automatically starts the client socket handler upon
+/// new connection (one connection only)
+Future<ServerSocket> startTcpServer(int port) async {
+  var ss =
+      await ServerSocket.bind(InternetAddress.anyIPv4, port, shared: true);
+  _ss = ss;
+  _ss.listen((client) {
+    getTcp(client);
+  });
+  return ss;
+}
 
 Future<void> getModem(String address) async {
     try {
@@ -51,7 +51,7 @@ Future<void> getModem(String address) async {
       spc.setFlowControl(SerialPortFlowControl.none);
       if (Platform.isLinux || Platform.isMacOS) {
         print('Linux Radio:$address');
-        _modem = SerialPort('/dev/$address');
+        _modem = SerialPort('/dev/$address'); // i.e. ttyACM0
         open = _modem.openReadWrite();
         _modem.config = spc;        
       } else {
@@ -83,7 +83,7 @@ Future<void> getModem(String address) async {
 /// Write Serial port data to the TCP Socket
 Future<void> handleSerialPortData(Uint8List lines) async {
   print(String.fromCharCodes(lines));
-  if(b_NetConnected) {
+  if(bNetConnected) {
     _tcp.write(String.fromCharCodes(lines)); // for String data
     // or _tcp.write(lines); // for binary data
     await _tcp.flush();
@@ -102,7 +102,7 @@ Future<void> handleTCPPortData(Uint8List lines) async {
 void getTcp(Socket client) {
     _tcp = client;
     _tcp.setOption(SocketOption.tcpNoDelay, true);
-    b_NetConnected = true;
+    bNetConnected = true;
     //String controlBuffer = '';
     print('Control client connected...');
     client.listen((Uint8List data) async {
@@ -115,6 +115,6 @@ void getTcp(Socket client) {
     onDone: () {
       print('Control client finished...');
       client.close();
-      b_NetConnected = false;
+      bNetConnected = false;
     });
   }
