@@ -7,21 +7,23 @@ import 'dart:typed_data';
 late SerialPort _modem;
 late ServerSocket _ss;
 late Socket _tcp;
+String _port = '19798'; // default
 String serBuffer = '';
 bool bNetConnected = false;
 void main(List<String> arguments) {
-  print('NetPort!');
-  var port = '19798'; // default
+  //print('NetPort!');
+  
   /// create the socket/serial to the modem/controller and set up handlers
   
-  String serial = 'ttyACM0'; // default for Harris radio
+  var serial = 'ttyACM0'; // default for radio
   if(arguments.isNotEmpty) {
     serial = arguments.first;
   }
   if(arguments.length > 1) {
-    port = arguments.elementAt(1);
+    _port = arguments.elementAt(1);
+    //print("port: $_port");
   }
-  startTcpServer(int.parse(port));  
+  startTcpServer(int.parse(_port));  
   getModem(serial);
 }
 
@@ -36,6 +38,7 @@ Future<ServerSocket> startTcpServer(int port) async {
   _ss.listen((client) {
     getTcp(client);
   });
+  print('Server Socket started on port: $port');
   return ss;
 }
 
@@ -50,15 +53,16 @@ Future<void> getModem(String address) async {
       spc.stopBits = 1;
       spc.setFlowControl(SerialPortFlowControl.none);
       if (Platform.isLinux || Platform.isMacOS) {
-        print('Linux Radio:$address');
+        print('Linux Radio: $address');
         _modem = SerialPort('/dev/$address'); // i.e. ttyACM0
         open = _modem.openReadWrite();
         _modem.config = spc;        
       } else {
         // essentially Windows is the only other viable candidate ATM
-        print('Windows Radio:$address');
+        print('Windows Radio: $address');
         _modem = SerialPort(address); // i.e. COM23
-        open = _modem.openReadWrite();        
+        open = _modem.openReadWrite();   
+        spc.dtr = 1; // Windows is weird
         _modem.config = spc;        
       }      
       if (open) {
