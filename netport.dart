@@ -1,4 +1,3 @@
-// import 'package:netport/netport.dart' as netport;
 import 'package:libserialport/libserialport.dart';
 import 'dart:io';
 import 'dart:async';
@@ -15,9 +14,10 @@ void main(List<String> arguments) {
   
   /// create the socket/serial to the modem/controller and set up handlers
   
-  var serial = 'ttyACM0'; // default for radio
+  var serial = 'ttyACM0'; // default
   if(arguments.isNotEmpty) {
     serial = arguments.first;
+    //print("serial:$serial");
   }
   if(arguments.length > 1) {
     _port = arguments.elementAt(1);
@@ -54,6 +54,9 @@ Future<void> getModem(String address) async {
       spc.setFlowControl(SerialPortFlowControl.none);
       if (Platform.isLinux || Platform.isMacOS) {
         print('Linux Radio: $address');
+        if(address.startsWith("/dev/")) {
+          address = address.substring(5);
+        }
         _modem = SerialPort('/dev/$address'); // i.e. ttyACM0
         open = _modem.openReadWrite();
         _modem.config = spc;        
@@ -86,7 +89,7 @@ Future<void> getModem(String address) async {
 
 /// Write Serial port data to the TCP Socket
 Future<void> handleSerialPortData(Uint8List lines) async {
-  print(String.fromCharCodes(lines));
+  print("TCP: ${String.fromCharCodes(lines)}");
   if(bNetConnected) {
     _tcp.write(String.fromCharCodes(lines)); // for String data
     // or _tcp.write(lines); // for binary data
@@ -96,7 +99,7 @@ Future<void> handleSerialPortData(Uint8List lines) async {
 
 /// Write TCP data to the Serial Port
 Future<void> handleTCPPortData(Uint8List lines) async {
-  print(String.fromCharCodes(lines));
+  print("Serial: ${String.fromCharCodes(lines)}");
   if(_modem.isOpen) {
     _modem.write(lines);
     _modem.drain();
