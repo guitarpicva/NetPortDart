@@ -14,7 +14,7 @@ void main(List<String> arguments) {
   
   /// create the socket/serial to the modem/controller and set up handlers
   
-  var serial = 'ttyACM0'; // default for radio
+  var serial = 'ttyACM0'; // default
   if(arguments.isNotEmpty) {
     serial = arguments.first;
     //print("serial:$serial");
