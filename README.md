@@ -15,3 +15,6 @@ This is a straighforward (read "un-polished") example to send all data from the
 serial port to the TCP server's connected client TCP socket (and back!).
 
 One could do the same with UDP or Domain sockets as well.
+
+TODO: Needs a watchdog on the serial connection to re-make the link
+if it fails or goes away.
