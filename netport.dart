@@ -6,24 +6,24 @@ import 'dart:typed_data';
 late SerialPort _modem;
 late ServerSocket _ss;
 late Socket _tcp;
-String _port = '19798'; // default
 String serBuffer = '';
 bool bNetConnected = false;
 void main(List<String> arguments) {
   //print('NetPort!');
   
-  /// create the socket/serial to the modem/controller and set up handlers
+  /// create the socket/serial connections and set up handlers
   
   var serial = 'ttyACM0'; // default
   if(arguments.isNotEmpty) {
     serial = arguments.first;
     //print("serial:$serial");
   }
+  var port = '19798'; // default
   if(arguments.length > 1) {
-    _port = arguments.elementAt(1);
+    port = arguments.elementAt(1);
     //print("port: $_port");
   }
-  startTcpServer(int.parse(_port));  
+  startTcpServer(int.parse(port));  
   getModem(serial);
 }
 
