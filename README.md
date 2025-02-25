@@ -18,3 +18,7 @@ One could do the same with UDP or Domain sockets as well.
 
 TODO: Needs a watchdog on the serial connection to re-make the link
 if it fails or goes away.
+
+To start the program, call the resulting compiled filename with up to two parameters.
+0) serial port name.  COM5 or ttyACM0, etc. (no path to *nix devices)
+1) TCP port to listen on for the TCP Server side
