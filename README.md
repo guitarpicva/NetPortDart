@@ -6,7 +6,7 @@ NOTE: in Linux the libserialport0 package should be installed (Debian and
 derivatives) and a proper symlink created for the base lib name
 ~~~
 cd /lib/x86_64-linux-gnu
-sudo ln -s libserialport.so0.1.0 libserialport.so
+sudo ln -s libserialport.so.0.1.0 libserialport.so
 ~~~
 Dart dependency is "libserialport"
 
