@@ -2,13 +2,8 @@
 Dart implementation of a serial to tcp wedge.
 
 Connect an RS-232 serial device to a TCP Server Socket bi-directionally.
-NOTE: in Linux the libserialport0 package should be installed (Debian and
-derivatives) and a proper symlink created for the base lib name
-~~~
-cd /lib/x86_64-linux-gnu
-sudo ln -s libserialport.so.0.1.0 libserialport.so
-~~~
-Dart dependency is "libserialport"
+
+Linux dependency is "libserialport-dev" (Debian, etc.)
 
 This is a straighforward (read "un-polished") example to send all data from the
 serial port to the TCP server's connected client TCP socket (and back!).
