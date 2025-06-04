@@ -9,7 +9,8 @@
             "request": "launch",
             "type": "dart",
             "args": [
-                "ttyACM0",
+                "ttyUSB0",
+                "115200",
                 "19798"
             ]
         }
