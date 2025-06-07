@@ -13,7 +13,7 @@ One could do the same with UDP or Domain sockets as well.
 TODO: Needs a watchdog on the serial connection to re-make the link
 if it fails or goes away.
 
-To start the program, call the resulting compiled filename with up to two parameters.
+To start the program, call the resulting compiled filename with up to three parameters.
 See the main() function for more explanation and defaults.
 
 0) serial port name.  COM5 or ttyACM0, etc. (no path to *nix devices)
