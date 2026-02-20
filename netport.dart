@@ -1,15 +1,25 @@
-import 'package:libserialport/libserialport.dart';
-import 'dart:io';
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
+
+import 'package:libserialport/libserialport.dart';
 
 late SerialPort _modem;
 late ServerSocket _ss;
 late Socket _tcp;
 bool bNetConnected = false;
+
+/// netport connects to a serial device and transfers all data bi-directionally
+/// to a TCP server socket.  Typical use case would be on a host which needs
+/// data to flow to a container.
+/// 
+/// Optional input parameters are:
+/// 1. serial port file - def. ttyACM0
+/// 2. serial port speed (baud) [only 8N1 no flow control] - def. 19798
+/// 3. TCP server socket port number - def. 19798
 void main(List<String> arguments) async {  
   /// create the socket/serial connections and set up handlers  
-  var serial = ''; // default
+  var serial = 'ttyACM0'; // default for first PRC-160 device
   if(arguments.isNotEmpty) {
     serial = arguments.first;
     //print("serial:$serial");
@@ -132,11 +142,10 @@ Future<void> getSerial(String address, int speed) async {
 /// Write Serial port data to the TCP Socket. but only if
 /// a client is currently connected.
 Future<void> handleSerialPortData(Uint8List data) async {
-  print("Serial To TCP: ${String.fromCharCodes(data)}");
+  // print("Serial To TCP: ${String.fromCharCodes(data)}");
   if(bNetConnected) {
-    _tcp.write(data); // for String data
-    // or _tcp.write(lines); // for binary data
-    //await _tcp.drain();
+    final out = String.fromCharCodes(data);
+    _tcp.write(out); // for String data
   }
 }
 
@@ -154,7 +163,7 @@ void getTcp(Socket client) {
     _tcp = client;
     _tcp.setOption(SocketOption.tcpNoDelay, true);
     bNetConnected = true;
-    print('Control client connected...');
+    //print('Control client connected...');
     client.listen((Uint8List data) async {
         handleTCPPortData(data);            
     },
