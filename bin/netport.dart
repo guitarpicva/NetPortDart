@@ -45,7 +45,7 @@ void main(List<String> arguments) async {
 /// Use watchDog() to check the serial connection and
 /// re-establish if necessary.
 void watchDog(String serial, int speed){ 
-  print('Watchdog...'); 
+  // print('Watchdog...'); 
   try{
     if(_serial.isOpen) { return; }
     else {
