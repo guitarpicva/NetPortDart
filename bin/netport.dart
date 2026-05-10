@@ -4,12 +4,13 @@ import 'dart:typed_data';
 
 import 'package:libserialport/libserialport.dart';
 
-late SerialPort _modem;
+late SerialPort _serial;
 late ServerSocket _ss;
-late Socket _tcp;
+late Socket _tcp; // single TCP connection allowed by default
 bool bNetConnected = false;
+int _port = 19798;
 
-/// netport connects to a serial device and transfers all data bi-directionally
+/// netport connects to a named serial device and transfers all data bi-directionally
 /// to a TCP server socket.  Typical use case would be on a host which needs
 /// data to flow to a container.
 /// 
@@ -28,16 +29,16 @@ void main(List<String> arguments) async {
   if(arguments.length > 1) {
     speed = int.parse(arguments.elementAt(1));
   }
-  var port = '19798'; // default
+  _port = 19798; // default
   if(arguments.length > 2) {
-    port = arguments.elementAt(2);
-    //print("port: $_port");
+    _port = int.parse(arguments.elementAt(2).toString());
+    print("port: $_port");
   }  
   // connect to the serial first. if no serial,
   // can decide whether or not to proceed or fail with error
   await getSerial(serial, speed);
   // serial connected to start listening on configured TCP port
-  startTcpServer(int.parse(port));    
+  // startTcpServer(int.parse(port));    
   Timer.periodic(Duration(seconds:10), (t) { watchDog(serial, speed); });
 }
 
@@ -45,12 +46,18 @@ void main(List<String> arguments) async {
 /// re-establish if necessary.
 void watchDog(String serial, int speed){ 
   print('Watchdog...'); 
-  if(_modem.isOpen) { return; }
-  else {
-    // try to re-connect to the serial device
-    print('Re-connect to serial...');
+  try{
+    if(_serial.isOpen) { return; }
+    else {
+      // try to re-connect to the serial device
+      print('Re-connect to serial...');
+      getSerial(serial, speed);
+    }  
+  }
+  catch(sererr) {
+    print(sererr.toString());
     getSerial(serial, speed);
-  }  
+  }
 }
 
 /// Start the server process to listen on the any ip address.
@@ -88,45 +95,44 @@ Future<void> getSerial(String address, int speed) async {
       if(address.startsWith("/dev/")) {
         address = address.substring(5);
       }
-      _modem = SerialPort('/dev/$address'); // i.e. ttyACM0
-      open = _modem.openReadWrite();
-      _modem.config = spc;        
+      _serial = SerialPort('/dev/$address'); // i.e. ttyACM0
+      open = _serial.openReadWrite();
+      _serial.config = spc;        
+      spc.dtr = 1; // Windows is weird
     } else {
       // essentially Windows is the only other viable candidate ATM
       // print('Windows Port: $address');
-      _modem = SerialPort(address); // i.e. COM23
-      open = _modem.openReadWrite();   
+      _serial = SerialPort(address); // i.e. COM23
+      open = _serial.openReadWrite();   
       spc.dtr = 1; // Windows is weird
-      _modem.config = spc;        
+      _serial.config = spc;        
     }      
     if (open) {
       print("$address: OPEN!");
-      final reader = SerialPortReader(_modem);
+      final reader = SerialPortReader(_serial);
       reader.stream.listen((data) {
         handleSerialPortData(data);        
       },
       onError: (error) {
             print('Serial Port Error: ${error.toString()}');
             reader.close();
-            _modem.close();
+            _serial.close();
             // Timer(const Duration(seconds: 2), () {
-            //   getModem(_modemAddress);
+            //   getModem(_serialAddress);
             // });
           },
-          onDone: (){
-            print('Serial Port Done');
-            reader.close();
-            _modem.close();
-            // Timer(const Duration(seconds: 2), () {
-            //   getModem(_modemAddress);
-            // });
-          },
-          cancelOnError: false
+      onDone: (){
+        print('Serial Port Done');
+        reader.close();
+        _serial.close();
+      },
+      cancelOnError: false
       );
+      await startTcpServer(_port);          
     } 
     else {
       print("$address: NOT OPEN!");
-      _modem.dispose();
+      _serial.dispose();
     }
     spc.dispose();
   } 
@@ -144,8 +150,7 @@ Future<void> getSerial(String address, int speed) async {
 Future<void> handleSerialPortData(Uint8List data) async {
   // print("Serial To TCP: ${String.fromCharCodes(data)}");
   if(bNetConnected) {
-    final out = String.fromCharCodes(data);
-    _tcp.write(out); // for String data
+    _tcp.write(String.fromCharCodes(data)); // for String data
   }
 }
 
@@ -153,9 +158,9 @@ Future<void> handleSerialPortData(Uint8List data) async {
 /// serial port is currently open.
 Future<void> handleTCPPortData(Uint8List data) async {
   //print("TCP To Serial: ${String.fromCharCodes(data)}");
-  if(_modem.isOpen) {
-    _modem.write(data);
-    _modem.drain();
+  if(_serial.isOpen) {
+    _serial.write(data);
+    _serial.drain();
   }
 }
 
