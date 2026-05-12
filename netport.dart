@@ -8,7 +8,7 @@ late SerialPort _serial;
 late ServerSocket _ss;
 late Socket _tcp; // single TCP connection allowed by default
 bool bNetConnected = false;
-int _port = 19798;
+int _port = 19790;
 
 /// netport connects to a named serial device and transfers all data bi-directionally
 /// to a TCP server socket.  Typical use case would be on a host which needs
@@ -29,7 +29,7 @@ void main(List<String> arguments) async {
   if(arguments.length > 1) {
     speed = int.parse(arguments.elementAt(1));
   }
-  _port = 19798; // default
+  _port = 19790; // default
   if(arguments.length > 2) {
     _port = int.parse(arguments.elementAt(2).toString());
     print("port: $_port");
