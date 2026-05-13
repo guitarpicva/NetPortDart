@@ -9,6 +9,7 @@ late ServerSocket _ss;
 late Socket _tcp; // single TCP connection allowed by default
 bool bNetConnected = false;
 int _port = 19790;
+String indata = '';
 
 /// netport connects to a named serial device and transfers all data bi-directionally
 /// to a TCP server socket.  Typical use case would be on a host which needs
@@ -77,7 +78,7 @@ Future<ServerSocket> startTcpServer(int port) async {
   _ss.listen((client) {
     getTcp(client);
   });
-  print('Server Socket started on port: $port');
+  // print('Server Socket started on port: $port');
   return ss;
 }
 
@@ -109,7 +110,7 @@ Future<void> getSerial(String address, int speed) async {
       _serial.config = spc;        
     }      
     if (open) {
-      print("$address: OPEN!");
+      // print("$address: OPEN!");
       final reader = SerialPortReader(_serial);
       reader.stream.listen((data) {
         handleSerialPortData(data);        
@@ -149,10 +150,23 @@ Future<void> getSerial(String address, int speed) async {
 /// Write Serial port data to the TCP Socket. but only if
 /// a client is currently connected.
 Future<void> handleSerialPortData(Uint8List data) async {
-  // print("Serial To TCP: ${String.fromCharCodes(data)}");
-  if(bNetConnected) {
-    _tcp.write(String.fromCharCodes(data)); // for String data
-    await _tcp.flush();
+  // print("Serial: ${String.fromCharCodes(data)}");
+  // gather data from the serial buffer
+  indata += String.fromCharCodes(data as List<int>);
+  // gather only the whole lines
+  var sdata = indata.substring(0, indata.lastIndexOf('\r\n') + 2);
+  // remove the whole lines from the global data buffer
+  indata = indata.substring(indata.lastIndexOf('\r\n') + 2);
+  // List<String> lines = [];
+  // split the lines on CRLF
+  var lines = sdata.split('\r\n');    
+  // process each line adding back the CRLF to the datagram
+  for(final line in lines) {   
+    if(line.isEmpty) { continue; }
+    if(bNetConnected) {
+      _tcp.write('$line\r\n'); // for String data
+      await _tcp.flush();
+    }
   }
 }
 

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -88,7 +87,7 @@ Future<void> getSerial(String address, int speed) async {
       _serial.config = spc;        
     }      
     if (open) {
-      print("$address: OPEN!");
+      // print("$address: OPEN!");
       final reader = SerialPortReader(_serial);
       reader.stream.listen((data) {        
         handleSerialPortData(data);        
@@ -128,20 +127,27 @@ Future<void> getSerial(String address, int speed) async {
 /// Write Serial port data to the TCP Socket. but only if
 /// a client is currently connected.
 Future<void> handleSerialPortData(Uint8List data) async {
-  // print("Serial To UDP: ${String.fromCharCodes(data)}");
+  //print("Serial: ${String.fromCharCodes(data)}");
   // gather data from the serial buffer
   indata += String.fromCharCodes(data as List<int>);
+  // if an empty line, bail
+  if(indata.length < 2) { 
+    indata = '';
+    return;
+  }
   // gather only the whole lines
-  var sdata = indata.substring(0, indata.lastIndexOf('\r\n') + 2);
+  final idx = indata.lastIndexOf('\r\n');
+  var sdata = indata.substring(0, idx);
   // remove the whole lines from the global data buffer
-  indata = indata.substring(indata.lastIndexOf('\r\n') + 2);
+  indata = indata.substring(idx + 2);
   // List<String> lines = [];
   // split the lines on CRLF
   var lines = sdata.split('\r\n');    
   // process each line adding back the CRLF to the datagram
   for(final line in lines) {    
     if(line.isEmpty) { continue; }
-    print('$line\r\n');
+    //print('$line\r\n');
+    // write the datagram to the UDP listener port + 1 (def. 19791)
     writeDatagram('$line\r\n'.codeUnits, '127.0.0.1', _port+1);
   }  
 }
@@ -173,7 +179,7 @@ void writeDatagram(List<int> data, String address, int port) {
 /// Write TCP data to the Serial Port, but only if the
 /// serial port is currently open.
 Future<void> handleUDPPortData(Uint8List data) async {
-  print("UDP To Serial: ${String.fromCharCodes(data)}");
+  //print("UDP To Serial: ${String.fromCharCodes(data)}");
   if(_serial.isOpen) {
     _serial.write(data);
     _serial.drain();
@@ -181,11 +187,11 @@ Future<void> handleUDPPortData(Uint8List data) async {
 }
 
 Future<void> createUdpListener(String bindAddress, int port) async {
-    print("build a UDP listener....$bindAddress:$port");
+    //print("build a UDP listener....$bindAddress:$port");
     final bindaddr = InternetAddress(bindAddress);
     var inetaddr = InternetAddress.anyIPv4;    
     if(bindaddr.isLoopback) {
-      print('LIS: bind UDP listener to localhost');
+      //print('LIS: bind UDP listener to localhost');
       inetaddr = InternetAddress.loopbackIPv4;
     }
     RawDatagramSocket.bind(inetaddr, port, reuseAddress: true).then((socket) {
