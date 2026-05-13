@@ -20,7 +20,7 @@ int _port = 19790;
 /// 3. TCP server socket port number - def. 19798
 void main(List<String> arguments) async {  
   /// create the socket/serial connections and set up handlers  
-  var serial = 'ttyACM0'; // default for first PRC-160 device
+  var serial = 'ttyACM0';
   if(arguments.isNotEmpty) {
     serial = arguments.first;
     //print("serial:$serial");
@@ -32,13 +32,14 @@ void main(List<String> arguments) async {
   _port = 19790; // default
   if(arguments.length > 2) {
     _port = int.parse(arguments.elementAt(2).toString());
-    print("port: $_port");
+    // print("port: $_port");
   }  
   // connect to the serial first. if no serial,
   // can decide whether or not to proceed or fail with error
   await getSerial(serial, speed);
-  // serial connected to start listening on configured TCP port
-  // startTcpServer(int.parse(port));    
+  // start the TCP server socket to handle one client
+  // connection.
+  await startTcpServer(_port);  
   Timer.periodic(Duration(seconds:10), (t) { watchDog(serial, speed); });
 }
 
@@ -67,7 +68,7 @@ void watchDog(String serial, int speed){
 // Consider limiting this to the Docker IP space if
 // used for Docker.  NetPort would live on the host
 // machine, in order to link the ASCII port into
-// a running container via a socket.
+// a running container via a TCP socket.
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 Future<ServerSocket> startTcpServer(int port) async {
   var ss =
@@ -128,7 +129,7 @@ Future<void> getSerial(String address, int speed) async {
       },
       cancelOnError: false
       );
-      await startTcpServer(_port);          
+              
     } 
     else {
       print("$address: NOT OPEN!");
@@ -155,16 +156,6 @@ Future<void> handleSerialPortData(Uint8List data) async {
   }
 }
 
-/// Write TCP data to the Serial Port, but only if the
-/// serial port is currently open.
-Future<void> handleTCPPortData(Uint8List data) async {
-  //print("TCP To Serial: ${String.fromCharCodes(data)}");
-  if(_serial.isOpen) {
-    _serial.write(data);
-    _serial.drain();
-  }
-}
-
 void getTcp(Socket client) {
     _tcp = client;
     _tcp.setOption(SocketOption.tcpNoDelay, true);
@@ -183,3 +174,13 @@ void getTcp(Socket client) {
       bNetConnected = false;
     });
   }
+
+/// Write TCP data to the Serial Port, but only if the
+/// serial port is currently open.
+Future<void> handleTCPPortData(Uint8List data) async {
+  //print("TCP To Serial: ${String.fromCharCodes(data)}");
+  if(_serial.isOpen) {
+    _serial.write(data);
+    _serial.drain();
+  }
+}
