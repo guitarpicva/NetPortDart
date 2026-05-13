@@ -151,6 +151,7 @@ Future<void> handleSerialPortData(Uint8List data) async {
   // print("Serial To TCP: ${String.fromCharCodes(data)}");
   if(bNetConnected) {
     _tcp.write(String.fromCharCodes(data)); // for String data
+    await _tcp.flush();
   }
 }
 
