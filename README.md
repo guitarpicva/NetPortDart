@@ -3,6 +3,10 @@ Dart implementation of a serial to tcp wedge.
 
 Connect an RS-232 serial device to a TCP Server Socket bi-directionally.
 
+NOTE: This has been adjusted to ONLY function for CRLF delimited lines
+for ASCII text.  If you need to deal with binary serial data, then
+adjust handleSerialData() function accordingly.
+
 Linux dependency is "libserialport-dev" (Debian, etc.)
 
 This is a straighforward example to send all data from the
