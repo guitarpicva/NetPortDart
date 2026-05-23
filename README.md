@@ -12,7 +12,7 @@ Linux dependency is "libserialport-dev" (Debian, etc.)
 This is a straighforward example to send all data from the
 serial port to the TCP server's connected client TCP socket (and back!).
 
-One could do the same with UDP or Domain sockets as well.
+A UDP implementation is shown in dgport.dart.
 
 To start the program, call the resulting compiled filename with up to three parameters.
 See the main() function for more explanation and defaults.
