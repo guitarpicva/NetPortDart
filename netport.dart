@@ -8,16 +8,18 @@ late SerialPort _serial;
 late ServerSocket _ss;
 late Socket _tcp; // single TCP connection allowed by default
 bool bNetConnected = false;
+/// TCP port number for the network side
 int _port = 19790;
+/// Input buffer FROM the serial port
 String indata = '';
 
 /// netport connects to a named serial device and transfers all data bi-directionally
 /// to a TCP server socket.  Typical use case would be on a host which needs
-/// data to flow to a container.
+/// data to flow to a container where Docker host networking is not available.
 /// 
 /// Optional input parameters are:
 /// 1. serial port file - def. ttyACM0
-/// 2. serial port speed (baud) [only 8N1 no flow control] - def. 19798
+/// 2. serial port speed (baud) [only 8N1 no flow control] - def. 115200
 /// 3. TCP server socket port number - def. 19798
 void main(List<String> arguments) async {  
   /// create the socket/serial connections and set up handlers  
@@ -30,7 +32,7 @@ void main(List<String> arguments) async {
   if(arguments.length > 1) {
     speed = int.parse(arguments.elementAt(1));
   }
-  _port = 19790; // default
+  // _port = 19790; // default
   if(arguments.length > 2) {
     _port = int.parse(arguments.elementAt(2).toString());
     // print("port: $_port");
@@ -113,6 +115,7 @@ Future<void> getSerial(String address, int speed) async {
       // print("$address: OPEN!");
       final reader = SerialPortReader(_serial);
       reader.stream.listen((data) {
+
         handleSerialPortData(data);        
       },
       onError: (error) {
@@ -150,21 +153,26 @@ Future<void> getSerial(String address, int speed) async {
 /// Write Serial port data to the TCP Socket. but only if
 /// a client is currently connected.
 Future<void> handleSerialPortData(Uint8List data) async {
-  // print("Serial: ${String.fromCharCodes(data)}");
+  print("Serial: ${String.fromCharCodes(data)}");  
   // gather data from the serial buffer
   indata += String.fromCharCodes(data as List<int>);
-  // gather only the whole lines
-  var sdata = indata.substring(0, indata.lastIndexOf('\r\n') + 2);
+  // Wait until at least a full line has arrived
+  if(!indata.contains('\r\n')) { 
+    return;
+  }
+  // gather only the whole lines including the line end CRLF
+  final idx = indata.lastIndexOf('\r\n') + 2;
+  var sdata = indata.substring(0, idx);
   // remove the whole lines from the global data buffer
-  indata = indata.substring(indata.lastIndexOf('\r\n') + 2);
+  indata = indata.substring(idx);
   // List<String> lines = [];
   // split the lines on CRLF
   var lines = sdata.split('\r\n');    
   // process each line adding back the CRLF to the datagram
-  for(final line in lines) {   
-    if(line.isEmpty) { continue; }
+  for(final line in lines) {
+    if(line.trim().isEmpty) { continue; }
     if(bNetConnected) {
-      _tcp.write('$line\r\n'); // for String data
+      _tcp.write('${line.trim()}\r\n'); // for String data
       await _tcp.flush();
     }
   }

@@ -8,16 +8,18 @@ late SerialPort _serial;
 // late RawDatagramSocket _udp; // listener for UDP datagrams
 bool bNetConnected = false;
 int _port = 19790;
+int _outport = 19791;
 String indata = ''; // global serial buffer
 
-/// netport connects to a named serial device and transfers all data bi-directionally
-/// to a TCP server socket.  Typical use case would be on a host which needs
-/// data to flow to a container.
+/// dgport connects to a named serial device and transfers all data bi-directionally
+/// to a set of UDP sockets.  Typical use case would be on a host which needs
+/// data to flow to a container where Docker host neworking is not possible..
 /// 
 /// Optional input parameters are:
 /// 1. serial port file - def. ttyACM0
-/// 2. serial port speed (baud) [only 8N1 no flow control] - def. 19798
-/// 3. TCP server socket port number - def. 19798
+/// 2. serial port speed (baud) [only 8N1 no flow control] - def. 115200
+/// 3. UDP server socket port number for input data- def. 19790 and serial
+/// data is sent to port+1, def. 19791
 void main(List<String> arguments) async {  
   /// create the socket/serial connections and set up handlers  
   var serial = 'ttyACM0';
@@ -30,8 +32,10 @@ void main(List<String> arguments) async {
     speed = int.parse(arguments.elementAt(1));
   }
   _port = 19790; // default
+  _outport = 19791; // default
   if(arguments.length > 2) {
     _port = int.parse(arguments.elementAt(2).toString());
+    _outport = _port + 1; // next port number for sending datagrams
     // print("port: $_port");
   }  
   // connect to the serial first. if no serial,
@@ -87,6 +91,7 @@ Future<void> getSerial(String address, int speed) async {
       _serial.config = spc;        
     }      
     if (open) {
+      // print(_serial.productName);
       // print("$address: OPEN!");
       final reader = SerialPortReader(_serial);
       reader.stream.listen((data) {        
@@ -124,36 +129,40 @@ Future<void> getSerial(String address, int speed) async {
   return;
 }
 
-/// Write Serial port data to the TCP Socket. but only if
+/// Write Serial port data to the UDP Socket. but only if
 /// a client is currently connected.
 Future<void> handleSerialPortData(Uint8List data) async {
-  //print("Serial: ${String.fromCharCodes(data)}");
+  //print("Serial in: $data -- ${String.fromCharCodes(data as List<int>)}");
   // gather data from the serial buffer
   indata += String.fromCharCodes(data as List<int>);
-  // if an empty line, bail
-  if(indata.length < 2) { 
-    indata = '';
+  // wait to handle until the full line has arrived in the buffer
+  if(!indata.contains('\r\n')) { 
     return;
   }
+  //print("serial indata: $indata");
   // gather only the whole lines
-  final idx = indata.lastIndexOf('\r\n');
+  final idx = indata.lastIndexOf('\r\n') + 2;
+  // make a working buffer of the whole lines including trailing CRLF
   var sdata = indata.substring(0, idx);
   // remove the whole lines from the global data buffer
-  indata = indata.substring(idx + 2);
-  // List<String> lines = [];
+  indata = indata.substring(idx);
+  //print('SDATA: $sdata');
   // split the lines on CRLF
-  var lines = sdata.split('\r\n');    
-  // process each line adding back the CRLF to the datagram
-  for(final line in lines) {    
-    if(line.isEmpty) { continue; }
-    //print('$line\r\n');
-    // write the datagram to the UDP listener port + 1 (def. 19791)
-    writeDatagram('$line\r\n'.codeUnits, '127.0.0.1', _port+1);
-  }  
+  // if(sdata.contains('\n')) {
+    var lines = sdata.split('\r\n');    
+    //print("sLINES: $lines");
+    // process each line adding back the CRLF to the datagram
+    for(final line in lines) {    
+      if(line.trim().isEmpty) { continue; }
+      //print('sLINE: $line\r\n');
+      // write the datagram to the UDP listener _port + 1 (def. 19791)
+      await writeDatagram('${line.trim()}\r\n'.codeUnits, '127.0.0.1', _outport);
+    }  
+  // }
 }
 
 /// launch it to the specified address:port
-void writeDatagram(List<int> data, String address, int port) {
+Future<void> writeDatagram(List<int> data, String address, int port) async {
   final int bindPort = 0;
   final inetaddr = InternetAddress(address);      
   // default to listen everywhere
@@ -176,11 +185,12 @@ void writeDatagram(List<int> data, String address, int port) {
     });
   }
 
-/// Write TCP data to the Serial Port, but only if the
+/// Write UDP input port [_port] data to the Serial Port, but only if the
 /// serial port is currently open.
 Future<void> handleUDPPortData(Uint8List data) async {
-  //print("UDP To Serial: ${String.fromCharCodes(data)}");
+  print("UDP To Serial: ${String.fromCharCodes(data)}");
   if(_serial.isOpen) {
+    // print('datagram: $data');
     _serial.write(data);
     _serial.drain();
   }
