@@ -1,4 +1,5 @@
 import 'dart:async';
+// import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -20,7 +21,7 @@ String indata = '';
 /// Optional input parameters are:
 /// 1. serial port file - def. ttyACM0
 /// 2. serial port speed (baud) [only 8N1 no flow control] - def. 115200
-/// 3. TCP server socket port number - def. 19798
+/// 3. TCP server socket port number - def. 19790
 void main(List<String> arguments) async {  
   /// create the socket/serial connections and set up handlers  
   var serial = 'ttyACM0';
@@ -96,14 +97,19 @@ Future<void> getSerial(String address, int speed) async {
     spc.setFlowControl(SerialPortFlowControl.none);
     if (Platform.isLinux || Platform.isMacOS) {
       // print('Linux Port: $address');
+      // This seems silly to remove the path then put it back on, 
+      // but I think there may be different paths for MacOS that don't conform
+      // to '/dev/', so this is where to make that work.
       if(address.startsWith("/dev/")) {
         address = address.substring(5);
       }
       _serial = SerialPort('/dev/$address'); // i.e. ttyACM0
+      // END This seems silly
       open = _serial.openReadWrite();
       _serial.config = spc;        
       spc.dtr = 1; // Windows is weird
-    } else {
+    } 
+    else {
       // essentially Windows is the only other viable candidate ATM
       // print('Windows Port: $address');
       _serial = SerialPort(address); // i.e. COM23
@@ -114,17 +120,17 @@ Future<void> getSerial(String address, int speed) async {
     if (open) {
       // print("$address: OPEN!");
       final reader = SerialPortReader(_serial);
-      reader.stream.listen((data) {
-
-        handleSerialPortData(data);        
+      reader.stream.listen((data) async {
+        handleSerialPortData(data);
       },
       onError: (error) {
             print('Serial Port Error: ${error.toString()}');
+            // Close the reader and serial port and re-open later to recover
             reader.close();
             _serial.close();
-            // Timer(const Duration(seconds: 2), () {
-            //   getModem(_serialAddress);
-            // });
+            Timer(const Duration(seconds: 2), () {
+              getSerial(address, speed);
+            });
           },
       onDone: (){
         print('Serial Port Done');
@@ -142,8 +148,7 @@ Future<void> getSerial(String address, int speed) async {
     spc.dispose();
   } 
   catch (se) {
-    // connection to radio failed, so
-    // tell the UI to open the configuration Drawer
+    // connection to radio failed, so mayvbe tell a UI to open the configuration
     print('$address - SerialException: ${se.toString()}');   
     print("$address: NOT OPENED!");   
   }
@@ -153,10 +158,15 @@ Future<void> getSerial(String address, int speed) async {
 /// Write Serial port data to the TCP Socket. but only if
 /// a client is currently connected.
 Future<void> handleSerialPortData(Uint8List data) async {
-  print("Serial: ${String.fromCharCodes(data)}");  
+  // print("Serial: ${String.fromCharCodes(data)}");  
   // gather data from the serial buffer
   indata += String.fromCharCodes(data as List<int>);
-  // Wait until at least a full line has arrived
+  // Wait until at least a full line has arrived, but this is not REQUIRED
+  // each read could be handled since it's simply a stream of data from one
+  // port to the other.
+
+  // In this line based case, send only the fully received lines, saving
+  // and partial lines for their final parts.
   if(!indata.contains('\r\n')) { 
     return;
   }
@@ -165,34 +175,38 @@ Future<void> handleSerialPortData(Uint8List data) async {
   var sdata = indata.substring(0, idx);
   // remove the whole lines from the global data buffer
   indata = indata.substring(idx);
-  // List<String> lines = [];
-  // split the lines on CRLF
+  // Split the resulting list of lines on CRLF
   var lines = sdata.split('\r\n');    
-  // process each line adding back the CRLF to the datagram
+  // Process each line adding back the CRLF to the datagram
   for(final line in lines) {
     if(line.trim().isEmpty) { continue; }
     if(bNetConnected) {
-      _tcp.write('${line.trim()}\r\n'); // for String data
+      _tcp.write('${line.trim()}\r\n'); // Add back CRLF for String data
       await _tcp.flush();
     }
   }
+  // ALTERNATE method, to pass all serial port data activity directly to the
+  // TCP socket regardless of content.
+  //_tcp.write(data.toList());
+  //_tcp.flush();
+  // END ALTERNATE method
 }
 
 void getTcp(Socket client) {
     _tcp = client;
     _tcp.setOption(SocketOption.tcpNoDelay, true);
     bNetConnected = true;
-    //print('Control client connected...');
-    client.listen((Uint8List data) async {
-        handleTCPPortData(data);            
+    print('TCP client connected...');
+    _tcp.listen((Uint8List data) async {            
+      handleTCPPortData(data);            
     },
     cancelOnError: false,
     onError: (error) {
-      print('Control client error: $error');
+      print('TCP client error: $error');
     },
     onDone: () {
-      print('Control client finished...');
-      client.close();
+      print('TCP client finished...');
+      _tcp.close();
       bNetConnected = false;
     });
   }
@@ -200,7 +214,18 @@ void getTcp(Socket client) {
 /// Write TCP data to the Serial Port, but only if the
 /// serial port is currently open.
 Future<void> handleTCPPortData(Uint8List data) async {
-  //print("TCP To Serial: ${String.fromCharCodes(data)}");
+  // A possible case for String data using the LineSplitter
+  // LineSplitter ls = LineSplitter();
+  // List<String> sls = ls.convert(String.fromCharCodes(data));
+  // if(_serial.isOpen) {
+  //   for(String s in sls) {
+  //     _serial.write(s);
+  //     _serial.drain();
+  //    }
+  // }
+  // //print("TCP To Serial: ${String.fromCharCodes(data)}");
+  // print('Line Splitter: $sls');
+  // Otherwise, just senda ll data events through to the TCP socket
   if(_serial.isOpen) {
     _serial.write(data);
     _serial.drain();
